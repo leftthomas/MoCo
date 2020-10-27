@@ -14,24 +14,15 @@ conda install pytorch=1.6.0 torchvision cudatoolkit=10.2 -c pytorch
 `CIFAR10` dataset is used in this repo, the dataset will be downloaded into `data` directory by `PyTorch` automatically.
 
 ## Usage
-```
-python train.py --epochs 50 --feature_dim 256
-optional arguments:
---feature_dim                 Feature dim for each image [default value is 128]
---m                           Negative sample number [default value is 4096]
---temperature                 Temperature used in softmax [default value is 0.1]
---momentum                    Momentum used for the update of memory bank [default value is 0.5]
---k                           Top k most similar images used to predict the label [default value is 200]
---batch_size                  Number of images in each mini-batch [default value is 128]
---epochs                      Number of sweeps over the dataset to train [default value is 200]
-```
 
 ### Train MoCo
 ```
-python main.py --batch_size 1024 --epochs 1000 
+python train.py --batch_size 1024 --epochs 50
 optional arguments:
---feature_dim                 Feature dim for latent vector [default value is 128]
+--feature_dim                 Feature dim for each image [default value is 128]
+--m                           Negative sample number [default value is 4096]
 --temperature                 Temperature used in softmax [default value is 0.5]
+--momentum                    Momentum used for the update of memory bank [default value is 0.999]
 --k                           Top k most similar images used to predict the label [default value is 200]
 --batch_size                  Number of images in each mini-batch [default value is 512]
 --epochs                      Number of sweeps over the dataset to train [default value is 500]
@@ -41,18 +32,17 @@ optional arguments:
 ```
 python linear.py --batch_size 1024 --epochs 200 
 optional arguments:
---model_path                  The pretrained model path [default value is 'results/128_0.5_200_512_500_model.pth']
+--model_path                  The pretrained model path [default value is 'results/128_4096_0.5_0.999_200_512_500_model.pth']
 --batch_size                  Number of images in each mini-batch [default value is 512]
 --epochs                      Number of sweeps over the dataset to train [default value is 100]
 ```
 
 ## Results
 There are some difference between this implementation and official implementation, the model (`ResNet50`) is trained on 
-one NVIDIA TESLA V100(32G) GPU:
+one NVIDIA GeForce GTX 1070 GPU:
 1. No `Gaussian blur` used;
-2. `Adam` optimizer with learning rate `1e-3` is used to replace `LARS` optimizer;
-3. No `Linear learning rate scaling` used;
-4. No `Linear Warmup` and `CosineLR Schedule` used.
+2. `Adam` optimizer with learning rate `1e-3` is used to replace `SGD` optimizer;
+3. No `Linear learning rate scaling` used.
 
 <table>
 	<tbody>
