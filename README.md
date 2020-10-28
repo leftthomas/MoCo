@@ -49,9 +49,8 @@ one NVIDIA GeForce GTX TITAN GPU:
 		<!-- START TABLE -->
 		<!-- TABLE HEADER -->
 		<th>Evaluation Protocol</th>
-		<th>Params (M)</th>
-		<th>FLOPs (G)</th>
 		<th>Feature Dim</th>
+		<th>Momentum</th>
 		<th>Batch Size</th>
 		<th>Epoch Num</th>
 		<th>τ</th>
@@ -62,29 +61,27 @@ one NVIDIA GeForce GTX TITAN GPU:
 		<!-- TABLE BODY -->
 		<tr>
 			<td align="center">KNN</td>
-			<td align="center">24.62</td>
-			<td align="center">1.31</td>
 			<td align="center">128</td>
-			<td align="center">512</td>
+			<td align="center">0.999</td>
+			<td align="center">256</td>
 			<td align="center">500</td>
 			<td align="center">0.5</td>
 			<td align="center">200</td>
 			<td align="center">89.1</td>
 			<td align="center">99.6</td>
-			<td align="center"><a href="https://pan.baidu.com/s/1pRwF6Uw5xnqvs2p2xQK4ZQ">model</a>&nbsp;|&nbsp;gc5k</td>
+			<td align="center"><a href="https://pan.baidu.com/s/1GiMJFSuYubLMi550HtR88g">model</a>&nbsp;|&nbsp;tex8</td>
 		</tr>
 		<tr>
 			<td align="center">Linear</td>
-			<td align="center">23.52</td>
-			<td align="center">1.30</td>
 			<td align="center">-</td>
-			<td align="center">512</td>
+			<td align="center">-</td>
+			<td align="center">256</td>
 			<td align="center">100</td>
 			<td align="center">-</td>
 			<td align="center">-</td>
 			<td align="center"><b>92.0</b></td>
 			<td align="center"><b>99.8</b></td>
-			<td align="center"><a href="https://pan.baidu.com/s/1HQSNe2J-g1ptCiwKhz05cQ">model</a>&nbsp;|&nbsp;f7j2</td>
+			<td align="center"><a href="https://pan.baidu.com/s/13n0gja_KxNFj1M6T6g4miw">model</a>&nbsp;|&nbsp;6me4</td>
 		</tr>
 	</tbody>
 </table>
