@@ -61,9 +61,9 @@ def train_val(net, data_loader, train_optimizer):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Linear Evaluation')
-    parser.add_argument('--model_path', type=str, default='results/128_4096_0.5_0.999_200_512_500_model.pth',
+    parser.add_argument('--model_path', type=str, default='results/128_4096_0.5_0.999_200_256_500_model.pth',
                         help='The pretrained model path')
-    parser.add_argument('--batch_size', type=int, default=512, help='Number of images in each mini-batch')
+    parser.add_argument('--batch_size', type=int, default=256, help='Number of images in each mini-batch')
     parser.add_argument('--epochs', type=int, default=100, help='Number of sweeps over the dataset to train')
 
     args = parser.parse_args()

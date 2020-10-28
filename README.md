@@ -24,7 +24,7 @@ optional arguments:
 --temperature                 Temperature used in softmax [default value is 0.5]
 --momentum                    Momentum used for the update of memory bank [default value is 0.999]
 --k                           Top k most similar images used to predict the label [default value is 200]
---batch_size                  Number of images in each mini-batch [default value is 512]
+--batch_size                  Number of images in each mini-batch [default value is 256]
 --epochs                      Number of sweeps over the dataset to train [default value is 500]
 ```
 
@@ -32,14 +32,14 @@ optional arguments:
 ```
 python linear.py --batch_size 1024 --epochs 200 
 optional arguments:
---model_path                  The pretrained model path [default value is 'results/128_4096_0.5_0.999_200_512_500_model.pth']
---batch_size                  Number of images in each mini-batch [default value is 512]
+--model_path                  The pretrained model path [default value is 'results/128_4096_0.5_0.999_200_256_500_model.pth']
+--batch_size                  Number of images in each mini-batch [default value is 256]
 --epochs                      Number of sweeps over the dataset to train [default value is 100]
 ```
 
 ## Results
 There are some difference between this implementation and official implementation, the model (`ResNet50`) is trained on 
-one NVIDIA GeForce GTX 1070 GPU:
+one NVIDIA GeForce GTX TITAN GPU:
 1. No `Gaussian blur` used;
 2. `Adam` optimizer with learning rate `1e-3` is used to replace `SGD` optimizer;
 3. No `Linear learning rate scaling` used.
