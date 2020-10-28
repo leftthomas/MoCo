@@ -4,7 +4,6 @@ import pandas as pd
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -13,48 +12,38 @@ from model import Model
 
 
 # train for one epoch to learn unique features
-def train(net, data_loader, train_optimizer):
-    global z
-    net.train()
+def train(encoder_q, encoder_k, data_loader, train_optimizer):
+    global memory_queue
+    encoder_q.train()
     total_loss, total_num, train_bar = 0.0, 0, tqdm(data_loader)
-    for data, target, pos_index in train_bar:
-        data = data.to('cuda')
-        train_optimizer.zero_grad()
-        features = net(data)
+    for x_q, x_k, _ in train_bar:
+        x_q, x_k = x_q.cuda(non_blocking=True), x_k.cuda(non_blocking=True)
+        _, query = encoder_q(x_q)
 
-        # randomly generate M+1 sample indexes for each batch ---> [B, M+1]
-        idx = torch.randint(high=n, size=(data.size(0), m + 1))
-        # make the first sample as positive
-        idx[:, 0] = pos_index
-        # select memory vectors from memory bank ---> [B, 1+M, D]
-        samples = torch.index_select(memory_bank, dim=0, index=idx.view(-1)).view(data.size(0), -1, feature_dim)
-        # compute cos similarity between each feature vector and memory bank ---> [B, 1+M]
-        sim_matrix = torch.bmm(samples.to(device=features.device), features.unsqueeze(dim=-1)).view(data.size(0), -1)
-        out = torch.exp(sim_matrix / temperature)
-        # Monte Carlo approximation, use the approximation derived from initial batches as z
-        if z is None:
-            z = out.detach().mean() * n
-        # compute P(i|v) ---> [B, 1+M]
-        output = out / z
+        # shuffle BN
+        idx = torch.randperm(x_k.size(0), device=x_k.device)
+        _, key = encoder_k(x_k[idx])
+        key = key[torch.argsort(idx)]
 
+        score_pos = torch.bmm(query.unsqueeze(dim=1), key.unsqueeze(dim=-1)).squeeze(dim=-1)
+        score_neg = torch.mm(query, memory_queue.t().contiguous())
+        # [B, 1+M]
+        out = torch.cat([score_pos, score_neg], dim=-1)
         # compute loss
-        # compute log(h(i|v))=log(P(i|v)/(P(i|v)+M*P_n(i))) ---> [B]
-        p_d = (output.select(dim=-1, index=0) / (output.select(dim=-1, index=0) + m / n)).log()
-        # compute log(1-h(i|v'))=log(1-P(i|v')/(P(i|v')+M*P_n(i))) ---> [B, M]
-        p_n = ((m / n) / (output.narrow(dim=-1, start=1, length=m) + m / n)).log()
-        # compute J_NCE(θ)=-E(P_d)-M*E(P_n)
-        loss = - (p_d.sum() + p_n.sum()) / data.size(0)
+        loss = F.cross_entropy(out / temperature, torch.zeros(x_q.size(0), dtype=torch.long, device=x_q.device))
+
+        train_optimizer.zero_grad()
         loss.backward()
         train_optimizer.step()
 
-        # update memory bank ---> [B, D]
-        pos_samples = samples.select(dim=1, index=0)
-        pos_samples = features.detach().cpu() * momentum + pos_samples * (1.0 - momentum)
-        pos_samples = F.normalize(pos_samples, dim=-1)
-        memory_bank.index_copy_(dim=0, index=pos_index, source=pos_samples)
+        # momentum update
+        for parameter_q, parameter_k in zip(encoder_q.parameters(), encoder_k.parameters()):
+            parameter_k.data.copy_(parameter_k.data * momentum + parameter_q.data * (1.0 - momentum))
+        # update queue
+        memory_queue = torch.cat((memory_queue, key.clone().detach()), dim=0)[key.size(0):]
 
-        total_num += data.size(0)
-        total_loss += loss.item() * data.size(0)
+        total_num += x_q.size(0)
+        total_loss += loss.item() * x_q.size(0)
         train_bar.set_description('Train Epoch: [{}/{}] Loss: {:.4f}'.format(epoch, epochs, total_loss / total_num))
 
     return total_loss / total_num
@@ -66,21 +55,22 @@ def test(net, memory_data_loader, test_data_loader):
     total_top1, total_top5, total_num, feature_bank = 0.0, 0.0, 0, []
     with torch.no_grad():
         # generate feature bank
-        for data, target, _ in tqdm(memory_data_loader, desc='Feature extracting'):
-            feature_bank.append(net(data.to('cuda')))
+        for data, _, target in tqdm(memory_data_loader, desc='Feature extracting'):
+            feature, out = net(data.cuda(non_blocking=True))
+            feature_bank.append(feature)
         # [D, N]
-        feature_bank = torch.cat(feature_bank).t().contiguous()
+        feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()
         # [N]
         feature_labels = torch.tensor(memory_data_loader.dataset.targets, device=feature_bank.device)
         # loop test data to predict the label by weighted knn search
         test_bar = tqdm(test_data_loader)
-        for data, target, _ in test_bar:
-            data, target = data.to('cuda'), target.to('cuda')
-            output = net(data)
+        for data, _, target in test_bar:
+            data, target = data.cuda(non_blocking=True), target.cuda(non_blocking=True)
+            feature, out = net(data)
 
             total_num += data.size(0)
             # compute cos similarity between each feature vector and feature bank ---> [B, N]
-            sim_matrix = torch.mm(output, feature_bank)
+            sim_matrix = torch.mm(feature, feature_bank)
             # [B, K]
             sim_weight, sim_indices = sim_matrix.topk(k=k, dim=-1)
             # [B, K]
@@ -104,7 +94,7 @@ def test(net, memory_data_loader, test_data_loader):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Train NPID')
+    parser = argparse.ArgumentParser(description='Train MoCo')
     parser.add_argument('--feature_dim', default=128, type=int, help='Feature dim for each image')
     parser.add_argument('--m', default=4096, type=int, help='Negative sample number')
     parser.add_argument('--temperature', default=0.5, type=float, help='Temperature used in softmax')
@@ -119,38 +109,42 @@ if __name__ == '__main__':
     k, batch_size, epochs = args.k, args.batch_size, args.epochs
 
     # data prepare
-    train_data = utils.CIFAR10Instance(root='data', train=True, transform=utils.train_transform, download=True)
-    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, num_workers=8)
-    memory_data = utils.CIFAR10Instance(root='data', train=True, transform=utils.test_transform, download=True)
-    memory_loader = DataLoader(memory_data, batch_size=batch_size, shuffle=False, num_workers=8)
-    test_data = utils.CIFAR10Instance(root='data', train=False, transform=utils.test_transform, download=True)
-    test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False, num_workers=8)
+    train_data = utils.CIFAR10Pair(root='data', train=True, transform=utils.train_transform, download=True)
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, num_workers=16, pin_memory=True,
+                              drop_last=True)
+    memory_data = utils.CIFAR10Pair(root='data', train=True, transform=utils.test_transform, download=True)
+    memory_loader = DataLoader(memory_data, batch_size=batch_size, shuffle=False, num_workers=16, pin_memory=True)
+    test_data = utils.CIFAR10Pair(root='data', train=False, transform=utils.test_transform, download=True)
+    test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False, num_workers=16, pin_memory=True)
 
     # model setup and optimizer config
-    model = Model(feature_dim).to('cuda')
-    optimizer = optim.SGD(model.parameters(), lr=0.03, momentum=0.9, weight_decay=5e-4)
-    print("# trainable model parameters:", sum(param.numel() if param.requires_grad else 0
-                                               for param in model.parameters()))
-    lr_scheduler = MultiStepLR(optimizer, milestones=[int(epochs * 0.6), int(epochs * 0.8)], gamma=0.1)
+    model_q = Model(feature_dim).cuda()
+    model_k = Model(feature_dim).cuda()
+    # initialize
+    for param_q, param_k in zip(model_q.parameters(), model_k.parameters()):
+        param_k.data.copy_(param_q.data)
+        # not update by gradient
+        param_k.requires_grad = False
+    optimizer = optim.Adam(model_q.parameters(), lr=1e-3, weight_decay=1e-6)
 
-    # z as normalizer, init with None, c as num of train class, n as num of train data
-    z, c, n = None, len(memory_data.classes), len(train_data)
-    # init memory bank as unit random vector ---> [N, D]
-    memory_bank = F.normalize(torch.randn(n, feature_dim), dim=-1)
+    # c as num of train class
+    c = len(memory_data.classes)
+    # init memory queue as unit random vector ---> [M, D]
+    memory_queue = F.normalize(torch.randn(m, feature_dim).cuda(), dim=-1)
 
     # training loop
     results = {'train_loss': [], 'test_acc@1': [], 'test_acc@5': []}
+    save_name_pre = '{}_{}_{}_{}_{}_{}_{}'.format(feature_dim, m, temperature, momentum, k, batch_size, epochs)
     best_acc = 0.0
     for epoch in range(1, epochs + 1):
-        train_loss = train(model, train_loader, optimizer)
+        train_loss = train(model_q, model_k, train_loader, optimizer)
         results['train_loss'].append(train_loss)
-        test_acc_1, test_acc_5 = test(model, memory_loader, test_loader)
+        test_acc_1, test_acc_5 = test(model_q, memory_loader, test_loader)
         results['test_acc@1'].append(test_acc_1)
         results['test_acc@5'].append(test_acc_5)
         # save statistics
         data_frame = pd.DataFrame(data=results, index=range(1, epoch + 1))
-        data_frame.to_csv('results/{}_results.csv'.format(feature_dim), index_label='epoch')
-        lr_scheduler.step(epoch)
+        data_frame.to_csv('results/{}_results.csv'.format(save_name_pre), index_label='epoch')
         if test_acc_1 > best_acc:
             best_acc = test_acc_1
-            torch.save(model.state_dict(), 'epochs/{}_model.pth'.format(feature_dim))
+            torch.save(model_q.state_dict(), 'results/{}_model.pth'.format(save_name_pre))
