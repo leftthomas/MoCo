@@ -40,7 +40,7 @@ def train(encoder_q, encoder_k, data_loader, train_optimizer):
         for parameter_q, parameter_k in zip(encoder_q.parameters(), encoder_k.parameters()):
             parameter_k.data.copy_(parameter_k.data * momentum + parameter_q.data * (1.0 - momentum))
         # update queue
-        memory_queue = torch.cat((memory_queue, key.clone().detach()), dim=0)[key.size(0):]
+        memory_queue = torch.cat((memory_queue, key), dim=0)[key.size(0):]
 
         total_num += x_q.size(0)
         total_loss += loss.item() * x_q.size(0)
