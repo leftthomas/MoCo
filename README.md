@@ -67,8 +67,8 @@ one NVIDIA GeForce GTX TITAN GPU:
 			<td align="center">500</td>
 			<td align="center">0.5</td>
 			<td align="center">200</td>
-			<td align="center">89.1</td>
-			<td align="center">99.6</td>
+			<td align="center">80.9</td>
+			<td align="center">99.1</td>
 			<td align="center"><a href="https://pan.baidu.com/s/1GiMJFSuYubLMi550HtR88g">model</a>&nbsp;|&nbsp;tex8</td>
 		</tr>
 		<tr>
@@ -79,8 +79,8 @@ one NVIDIA GeForce GTX TITAN GPU:
 			<td align="center">100</td>
 			<td align="center">-</td>
 			<td align="center">-</td>
-			<td align="center"><b>92.0</b></td>
-			<td align="center"><b>99.8</b></td>
+			<td align="center"><b>86.3</b></td>
+			<td align="center"><b>99.6</b></td>
 			<td align="center"><a href="https://pan.baidu.com/s/13n0gja_KxNFj1M6T6g4miw">model</a>&nbsp;|&nbsp;6me4</td>
 		</tr>
 	</tbody>
